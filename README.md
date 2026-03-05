@@ -11,8 +11,7 @@ If rain is likely in the next hours, it suggests not washing clothes.
 
 ## How to run
 
-1. Install Processing  
-https://processing.org/download
+1. Install Processing https://processing.org/download
 
 2. Download or clone this repository (just need the `.pde` file)
 
