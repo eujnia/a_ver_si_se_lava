@@ -1,158 +1,94 @@
 import java.time.*;
 import java.time.format.*;
 
-// UI / Paleta
+// paleta de colores
 
 
-// Color del panel tipo vidrio (RGBA: alpha 185 lo hace semitransparente)
-color UI_PANEL      = color(245, 248, 255, 185);
-
-// Borde suave del panel (más transparente todavía)
+//  panel tipo vidrio 
+color UI_PANEL = color(245, 248, 255, 185);
 color UI_PANEL_EDGE = color(255, 255, 255, 120);
 
-// Color principal de texto (azul grisáceo)
-color UI_TEXT       = color(35, 45, 70);
-
-// Color secundario de texto (más apagado)
-color UI_MUTED      = color(90, 105, 135);
-
-// Acento positivo (cuando conviene lavar)
+//  texto 
+color UI_TEXT = color(35, 45, 70);
+color UI_MUTED = color(90, 105, 135);
 color UI_ACCENT_OK  = color(90, 155, 125);
-
-// Acento negativo (cuando no conviene lavar)
 color UI_ACCENT_BAD = color(175, 110, 120);
-
-// Fuentes para UI (normal y bold)
 PFont fontUI;
 PFont fontUIBold;
 
-// Padding base para márgenes internos en paneles
+// oadding para márgenes d paneles
 int PAD = 12;
 
-// Resultado final de la lógica de decisión
 boolean convieneLavar = true;
-
-// Texto corto tipo prompt para el panel de nota
+ 
 String promptClima = "";
 
-
-// Config clima
-
-
-// Coordenadas para la consulta a Open-Meteo
+// config clima (santa fe vieja y peluda)
 float LAT = -31.6333;
 float LON = -60.7000;
-
-// Zona horaria para que Open-Meteo devuelva series alineadas a tu hora local
 String TZ = "America/Argentina/Cordoba";
 
-
-// -----------------------------------------------------------------------------
-// Geo por IP (sin permisos del navegador, funciona en PC normal)
-// Usa ip-api.com (simple) y cae a tu LAT/LON fija si falla.
-// -----------------------------------------------------------------------------
+ 
+// geo por IP si estás en otro lado
 boolean usarGeoIp = true;
 
 void actualizarUbicacionDesdeIP() {
   if (!usarGeoIp) return;
 
   try {
-    // Devuelve JSON con lat/lon y timezone por IP
-    // Ejemplo: { "lat":..., "lon":..., "timezone":"America/Argentina/Cordoba", ...}
+    // ej: { "lat":..., "lon":..., "timezone":"America/Argentina/Cordoba", ...}
     JSONObject geo = loadJSONObject("http://ip-api.com/json/?fields=status,message,lat,lon,timezone,city,country");
-
     String status = geo.getString("status");
     if (!status.equals("success")) {
-      // Si falla, no tocamos nada
       println("GeoIP fallo: " + geo.getString("message"));
       return;
     }
 
-    // Setea coordenadas y timezone globales
     LAT = geo.getFloat("lat");
     LON = geo.getFloat("lon");
-
-    // Timezone en formato IANA (justo lo que vos necesitás)
     TZ = geo.getString("timezone");
 
     println("GeoIP ok -> " + geo.getString("city") + ", " + geo.getString("country") +
             " | LAT=" + LAT + " LON=" + LON + " TZ=" + TZ);
 
   } catch (Exception e) {
-    // Si no hay internet o el endpoint no responde, seguimos con valores default
     println("GeoIP exception: " + e);
   }
 }
-// Estado del clima (se actualiza cada tanto)
 
 
-// Nubosidad como factor 0..1
-float cloud = 0.5;
-
-// Probabilidad de precipitación promedio 0..1 en próximas 12 horas
+float cloud = 0.5; // nubosidad 
 float precipProb = 0.0;
-
-// Viento en km/h (Open-Meteo suele devolver km/h para wind_speed_10m)
 float wind = 3.0;
-
-// Temperatura actual en °C
 float temp = 20.0;
-
-// Mínima y máxima del día (°C)
 float tMin = 0, tMax = 0;
-
-// Precipitación diaria acumulada del día (mm)
 float rainMm = 0;
 
-// Código de clima Open-Meteo/WMO para mapear a texto humano
-int weatherCode = -1;
-
-// Texto humano mostrado en el HUD
+int weatherCode = -1; // cod de clima Open-Meteo
 String conditionText = "cargando...";
 
-// Control de cuándo fue la última consulta y cada cuánto consultar
+
 int lastFetchMs = -999999;
 int fetchEveryMs = 60 * 1000; // 1 minuto
 
+// lluvia
 
-// Lluvia
-
-
-// Array de partículas de lluvia
 RainDrop[] drops;
-
-// Máximo de gotas instanciadas (tope)
 int maxDrops = 700;
-
-// Contador de horas con lluvia (ojo: se incrementa, pero no se resetea en cada fetch)
 int horasConLluvia = 0;
 
 
-// Optimización cielo (niebla cacheada)
-
-
-// Capa offscreen para dibujar la niebla una vez y reusarla
 PGraphics fogLayer;
-
-// Valores cacheados para decidir si hay que reconstruir la niebla
 float fogCloudCached = -999;
 float fogDayCached   = -999;
-
-// Cantidad máxima de puntos de niebla cuando está muy nublado
 int fogMax = 1200;
-
-// Altura relativa donde se dibuja la niebla (0.85 = 85% superior)
 float fogHeightFactor = 0.85;
 
-
-// Control de dibujo
-
-
-// Dibuja viento cada N frames para ahorrar CPU
+// Dibuja viento cada N frames 
 int windStride = 2;
 
 
-// setup: corre una vez al iniciar
+// corre una vez al iniciar
 void setup() {
   size(440, 220, P2D);
   pixelDensity(1);
@@ -169,8 +105,7 @@ void setup() {
   for (int i = 0; i < drops.length; i++) drops[i] = new RainDrop();
 
   fogLayer = createGraphics(width, height, P2D);
-
-  // NUEVO: primero ubicacion por IP
+ 
   actualizarUbicacionDesdeIP();
 
   // Luego clima ya con LAT/LON/TZ correctos
@@ -178,82 +113,60 @@ void setup() {
   promptClima = construirPromptClima();
 }
 
-// draw: corre cada frame
-
+ 
 void draw() {
-  // Si pasó el intervalo, vuelve a pedir clima
+  
   if (millis() - lastFetchMs > fetchEveryMs) fetchWeather();
 
-  // Calcular hora local como float (ej 13.5 = 13:30)
   float hourNow = localHourFloat();
-
-  // Factor día/noche 0..1 (1 = día, 0 = noche)
   float dayNow  = daylightFactor(hourNow);
-
-  // Dibuja cielo según hora, día/noche y nubosidad
+  
   drawSky(hourNow, dayNow, cloud);
-
-  // Dibuja suelo/agua según día/noche (y usa cloud dentro)
+  
   drawGround(dayNow);
 
-  // Dibuja viento cada windStride frames (ahorra trabajo)
   if (frameCount % windStride == 0) {
     drawWind(wind, cloud, dayNow);
   }
 
-  // Determina cuántas gotas activar según probabilidad de lluvia
   int activeDrops = int(map(constrain(precipProb, 0, 1), 0, 1, 0, maxDrops));
 
-  // Ajuste adaptativo: si baja el framerate, reduce gotas activas
   if (frameRate < 45) activeDrops = int(activeDrops * 0.6);
   if (frameRate < 30) activeDrops = int(activeDrops * 0.4);
 
-  // Actualiza y dibuja solo las gotas activas
+  // dibuja solo las gotas activas
   for (int i = 0; i < activeDrops; i++) {
     drops[i].update(wind);
     drops[i].display();
   }
 
-  // Dibuja HUD superior con datos de clima
   drawHud(hourNow);
 
-  // Dibuja panel inferior con prompt y recomendación de lavar
   drawNotePanel();
 }
 
 
-// Viento: líneas diagonales que simulan ráfagas
-
 void drawWind(float windMag, float cloud, float day) {
-  // Cantidad de líneas de viento según magnitud del viento (0..40 km/h)
+  // Cantidad de viento según magnitud
   int n = int(map(constrain(windMag, 0, 40), 0, 40, 20, 120));
-
-  // Ángulo de las líneas de viento (negativo = inclinación hacia arriba a la derecha)
   float angle = radians(-25);
 
-  // Vector unitario en la dirección del viento
   float dx = cos(angle);
   float dy = sin(angle);
 
-  // Color del viento de día y de noche
   color windDay = color(240, 248, 255);
   color windNight = color(190, 215, 255);
 
-  // Mezcla entre noche y día según factor day
   color wcol = lerpColor(windNight, windDay, day);
 
-  // Alpha base del viento: se ve más con nubes y durante el día
   float aBase = lerp(4, 14, cloud) * lerp(0.7, 1.0, day);
 
-  // Configura stroke con alpha calculado
   stroke(red(wcol), green(wcol), blue(wcol), aBase);
 
-  // Dibuja n líneas en posiciones aleatorias del cielo (hasta el horizonte 0.72)
   for (int i = 0; i < n; i++) {
     float x = random(width);
     float y = random(height * 0.72);
 
-    // Longitud variable, y además aumenta con el viento
     float len = random(10, 50) * map(constrain(windMag, 0, 40), 0, 40, 0.6, 1.4);
 
     // Línea orientada según dx/dy
@@ -262,10 +175,8 @@ void drawWind(float windMag, float cloud, float day) {
 }
 
 
-// Clima (Open-Meteo): construye URL, parsea JSON y actualiza estado
 
 void fetchWeather() {
-  // Marca cuándo se hizo el fetch (para el intervalo)
   lastFetchMs = millis();
 
   // Arma la URL con:
@@ -283,29 +194,21 @@ void fetchWeather() {
     + "&timezone=" + TZ;
 
   try {
-    // Descarga y parsea JSON automáticamente
     JSONObject json = loadJSONObject(url);
-
-    // ---------------- CURRENT ----------------
     JSONObject current = json.getJSONObject("current");
-
-    // Temperatura actual
+    
     temp = current.getFloat("temperature_2m");
 
-    // Nubosidad viene 0..100, se normaliza a 0..1
     float cloudPct = current.getFloat("cloud_cover");
     cloud = constrain(cloudPct / 100.0, 0, 1);
 
-    // Viento actual
     wind = current.getFloat("wind_speed_10m");
 
-    // Código de clima
     weatherCode = current.getInt("weather_code");
 
     // ---------------- DAILY (hoy) ----------------
     JSONObject daily = json.getJSONObject("daily");
 
-    // Arrays diarios: el índice 0 es hoy
     JSONArray mins = daily.getJSONArray("temperature_2m_min");
     JSONArray maxs = daily.getJSONArray("temperature_2m_max");
     JSONArray rains = daily.getJSONArray("precipitation_sum");
@@ -318,28 +221,21 @@ void fetchWeather() {
     // ---------------- HOURLY (alineado a ahora) ----------------
     JSONObject hourly = json.getJSONObject("hourly");
 
-    // Tiempos horarios (strings ISO) y sus series paralelas de lluvia y probabilidad
     JSONArray times = hourly.getJSONArray("time");
     JSONArray prProbArr = hourly.getJSONArray("precipitation_probability");
     JSONArray prMmArr   = hourly.getJSONArray("precipitation");
 
-    // Hora actual según API, para ubicar el índice correcto dentro del hourly
     String currentTimeStr = current.getString("time"); // ej 2026-03-05T11:00
 
-    // Busca índice exacto de esa hora en el array hourly.time
     int idxNow = findHourlyIndex(times, currentTimeStr);
 
-    // Si no está exacto, busca el primer índice posterior o igual
     if (idxNow < 0) idxNow = findNextHourlyIndex(times, currentTimeStr);
 
-    // Ventana de análisis: próximas 12 horas
     int horasARevisar = 12;
 
-    // Acumuladores para promedio de probabilidad
     float sumProb = 0;
     int count = 0;
 
-    // Supone que sí conviene lavar hasta que se demuestre lo contrario
     convieneLavar = true;
 
     // Promedio real de probabilidad en próximas 12 horas
@@ -347,15 +243,12 @@ void fetchWeather() {
       int idx = idxNow + i;
       if (idx < 0 || idx >= times.size()) break;
 
-      // Probabilidad viene 0..100, se normaliza a 0..1
       float p = prProbArr.getFloat(idx) / 100.0;
       p = constrain(p, 0, 1);
 
-      // Suma para promedio
       sumProb += p;
       count++;
 
-      // Lluvia en mm/h (fallback para la decisión)
       float mm = prMmArr.getFloat(idx);
 
       // Regla simple:
@@ -368,23 +261,18 @@ void fetchWeather() {
       }
     }
 
-    // Probabilidad promedio final (0 si no hubo datos)
     precipProb = (count > 0) ? (sumProb / count) : 0;
 
-    // Traduce weatherCode a texto para UI
     conditionText = weatherCodeToText(weatherCode);
 
-    // Actualiza el prompt textual
     promptClima = construirPromptClima();
 
   } catch (Exception e) {
-    // Si falla la request o el parse, muestra estado degradado
     conditionText = "sin conexión";
   }
 }
 
 
-// Utilidad: buscar índice exacto en hourly.time
 
 int findHourlyIndex(JSONArray times, String target) {
   for (int i = 0; i < times.size(); i++) {
@@ -394,47 +282,37 @@ int findHourlyIndex(JSONArray times, String target) {
 }
 
 
-// Utilidad: buscar el primer índice cuyo time sea >= target
 
 int findNextHourlyIndex(JSONArray times, String target) {
-  // Como es ISO YYYY-MM-DDTHH:MM, comparar strings sirve (orden lexicográfico)
   for (int i = 0; i < times.size(); i++) {
     String t = times.getString(i);
     if (t.compareTo(target) >= 0) return i;
   }
-  // Si todo falló, vuelve al inicio
   return 0;
 }
 
 
-// Hora local: devuelve hora como float, intentando usar TZ real
 
 float localHourFloat() {
   try {
-    // Hora real según zona horaria, para alinear cielo con TZ
     ZonedDateTime now = ZonedDateTime.now(ZoneId.of(TZ));
     return now.getHour() + now.getMinute() / 60.0;
   } catch (Exception e) {
-    // Fallback: hour() y minute() de Processing (depende del sistema)
     return (hour() + minute() / 60.0);
   }
 }
 
 
-// Cielo: gradiente, golden hour, glow solar/lunar, niebla cacheada y bruma
 
 void drawSky(float hour, float day, float cloud) {
 
   // ---------------- 1) Amanecer y atardecer ----------------
-  // Horas aproximadas, usadas para factor de luz y color cálido
   float sunrise = 6.5;
   float sunset  = 19.5;
 
-  // dawn: cerca de sunrise, dusk: cerca de sunset, 0 en resto
   float dawn = 1.0 - constrain(abs(hour - sunrise) / 1.2, 0, 1);
   float dusk = 1.0 - constrain(abs(hour - sunset)  / 1.2, 0, 1);
 
-  // golden toma el pico de cualquiera de los dos
   float golden = max(dawn, dusk);
 
   // Elevar al cuadrado suaviza la transición (menos lineal, más orgánica)
@@ -638,12 +516,10 @@ float daylightFactor(float hour) {
 
 
 void drawGround(float day) {
-  // ----------------------------------------------------------------------------
   // Agua más oscura + movimiento tipo olas, pero barato:
   // - 2 o 3 "capas" de olas grandes (seno) con pocos pasos en X
   // - el detalle fino se sugiere con pocas líneas horizontales (barato)
   // - nada de per-pixel ni miles de líneas
-  // ----------------------------------------------------------------------------
 
   // Base día/noche (profundo)
   color waterDay   = color(55, 110, 165);
@@ -664,9 +540,7 @@ void drawGround(float day) {
   int y0 = int(height * 0.72);
   int y1 = height;
 
-  // --------------------------------------------------------------------------
   // Olas grandes: 2 capas de curvas (line strip) con pocos puntos
-  // --------------------------------------------------------------------------
   // Paso en X: mientras más grande, más barato (y más "low poly")
   int stepX = 10;
 
@@ -708,9 +582,7 @@ void drawGround(float day) {
   }
   endShape();
 
-  // --------------------------------------------------------------------------
   // Textura barata: pocas líneas horizontales con offset ondulado
-  // --------------------------------------------------------------------------
   int lines = 14; // muy pocas, costo bajo
   strokeWeight(1);
 
@@ -730,9 +602,7 @@ void drawGround(float day) {
     line(dx, yy, width + dx, yy);
   }
 
-  // --------------------------------------------------------------------------
-  // Oscurecimiento suave al fondo (profundidad)
-  // --------------------------------------------------------------------------
+  
   for (int i = 0; i < 14; i++) {
     float yy = lerp(y0, y1, i / 13.0);
     float a  = lerp(0, 45, i / 13.0) * lerp(0.50, 1.00, 1.0 - day);
@@ -742,7 +612,6 @@ void drawGround(float day) {
 }
 
 
-// HUD superior: panel con clima ahora y barra vertical día/noche
 
 void drawHud(float hour) {
   // Posición y tamaño del panel HUD
@@ -886,13 +755,11 @@ void drawWrappedText(String s, float x, float y, float w, float lineH) {
 class RainDrop {
   float x, y, vy;
 
-  // Constructor: crea gota y la distribuye en altura aleatoria inicial
   RainDrop() {
     reset();
     y = random(height);
   }
 
-  // Reset: ubica la gota arriba del cielo y le da velocidad vertical aleatoria
   void reset() {
     x = random(width);
     y = random(-height * 0.5, 0);
