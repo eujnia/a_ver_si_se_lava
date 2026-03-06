@@ -1,10 +1,9 @@
-## A ver si se lava
+## a ver si se lava
 
 Just a tiny processing sketch that checks the weather and answers if you should do laundry today. It pulls live data from Open-Meteo and turns it into a very small animated landscape (sky, clouds, rain, wind and water movement change according to current conditions).
 If rain is likely in the next few hours, it suggests not washing clothes.
 
-<img width="744" height="490" alt="imagen" src="https://github.com/user-attachments/assets/bf3968c7-645f-4008-8a6c-af93e1053814" />
-
+<img width="859" height="678" alt="imagen" src="https://github.com/user-attachments/assets/300e9c73-1c8e-4c11-b999-092c6498be07" />
 
 #### How to run:
 
