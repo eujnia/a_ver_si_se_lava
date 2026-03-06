@@ -1,4 +1,10 @@
 import java.time.*;
+import processing.awt.PSurfaceAWT;
+import java.awt.Frame;
+import java.awt.geom.RoundRectangle2D;
+
+float humedad = 0;   // 0..1
+float closeR = 10;
 
 // -  intenta sacar ubicación aproximada por IP sino usa los de SANTA FE vieja y peluda
 
@@ -10,7 +16,7 @@ float LAT = DEFAULT_LAT;
 float LON = DEFAULT_LON;
 
 String ubicacionCorta = "SF"; // se pisa si conseguimos ubi
-
+ 
 float temp = 0;
 float cloud = 0;
 float wind = 0;
@@ -25,34 +31,55 @@ int lastFetchMs = -999999;
 int fetchEveryMs = 60 * 1000;
 
 void setup() {
-  size(440, 220, P2D);
+  size(400, 200);
+   // ventana real 
+  PSurfaceAWT.SmoothCanvas canvas = 
+     (PSurfaceAWT.SmoothCanvas) surface.getNative();
 
-  // ventanita pero que no se como sacarle el borde de arriba (mejora)
-  int x = displayWidth - 80;
-  int y = displayHeight - 90;
+  Frame frame = canvas.getFrame();
+  frame.dispose();
+  frame.setUndecorated(true);
+  frame.setVisible(true);
+  
+  // bordes redondeados 
+  frame.setShape(new RoundRectangle2D.Double(
+    0, 0, width, height, 30, 30
+  ));
+ 
+    
+  int margenDerecho = 20;
+  int margenInferior = 70;
+  
+  int x = displayWidth - 400 - margenDerecho;
+  int y = displayHeight - 200 - margenInferior;
+ 
   surface.setLocation(x, y);
-  surface.setTitle("");  // ← título de la ventana
+  surface.setTitle(""); 
   surface.setAlwaysOnTop(true);
 
+// ver como mover de lugar arrastrando el mouse mejorar
   smooth(4);
  
-  textFont(createFont("Monospaced", 16, true));
+  textFont(createFont("Consolas Bold", 16, true));
  
   tryFetchLocationByIP();
 
   fetchWeather();
 }
 
+ 
 void draw() {
   if (millis() - lastFetchMs > fetchEveryMs) fetchWeather();
 
   float hourNow = getLocalHour();
-  float day = getDayFactor(hourNow); // 0 noche, 1 día
+  float day = getDayFactor(hourNow); // 0 noche, 1 dia
 
   drawCozySky(day, hourNow);
   drawSeaWithWaves(day);
   drawRainIfNeeded();
   drawPanel(day);
+  
+  drawCloseButton();
 }
 
 float getDayFactor(float hourNow) {
@@ -64,7 +91,7 @@ float getDayFactor(float hourNow) {
 
 void drawCozySky(float day, float hourNow) {
   // gradiente día/noche con cambios segun la nubosidaad
-  //  el cielo cambia pero sin usar imagenes en processing 
+  //  el cielo cambia peeero sin usar imagenes  
   
   color dayTop = color(255, 214, 190);
   color dayBottom = color(255, 175, 160);
@@ -91,7 +118,7 @@ void drawCozySky(float day, float hourNow) {
 }
 
 void drawSunMoonGlow(float day, float hourNow) {
-  // da sensación de tiempo sin cálculos pesados  
+  // da sensación de tiempo sin cálculos   
   boolean esDia = day > 0.5;
 
   float tArc;
@@ -125,7 +152,7 @@ void drawNightStars(float day) {
   stroke(255, 255, 235, alpha);
   strokeWeight(2);
 
-  // Estrellas  NO parpadean ni cambian de lugar  
+  // estrellas pero rarisimo mejorar
   for (int i = 0; i < 35; i++) {
     float x = (i * 73) % width;
     float y = ((i * 41) % int(height * 0.55));
@@ -176,69 +203,90 @@ void drawWaveLayer(float yBase, float amp, float freq, float phase, color c, flo
   endShape();
 }
 
-void drawRainIfNeeded() {
-  if (precipProb < 0.35) return;
 
-  stroke(220, 230, 255, 120);
-  int gotas = int(map(precipProb, 0.35, 1.0, 25, 110));
+void drawRainIfNeeded() {
+ 
+  if (precipProb < 0.40) return;
+
+  float intensidad = map(constrain(precipProb, 0.50, 1.0), 0.50, 1.0, 0, 1);
+
+  // nueva cosita: 
+  intensidad *= map(constrain(cloud, 0.4, 1.0), 0.4, 1.0, 0.35, 1.0);
+
+  int gotas = int(map(intensidad, 0, 1, 12, 95));
+
+  stroke(220, 230, 255, 110 + 70 * intensidad);
+  strokeWeight(1.2);
+
   for (int i = 0; i < gotas; i++) {
     float x = random(width);
     float y = random(height * 0.68);
-    line(x, y, x + 3, y + 10);
+    float largo = 7 + 8 * intensidad;
+    float deriva = 2 + wind * 0.08;
+
+    line(x, y, x + deriva, y + largo);
   }
+
+  strokeWeight(1);
 }
 
 void drawPanel(float day) {
-  noStroke();
-  fill(255, 250, 245, 20);
-  rect(12, 12, width - 24, height - 24, 12);
+  //noStroke();
+  //fill(255, 250, 245, 20);
+  //rect(12, 12, width - 24, height - 24, 12);
 
-  stroke(255, 255, 255, 135);
-  noFill();
-  rect(12, 12, width - 24, height - 24, 12);
+  //stroke(255, 255, 255, 135);
+  //noFill();
+  //rect(12, 12, width - 24, height - 24, 12);
 
-  fill(42, 56, 82);
-  textSize(20);
-  text("Clima: " + conditionText, 24, 38);
-
-  textSize(14);
-
-  // texto ffff
-  String tempStr = "Hacen maso " + nf(temp, 0, 1) + "°C.";
-  text(tempStr, 24, 62);
 
   
-  float tx = 24 + textWidth(tempStr) + 8;
-  fill(42, 56, 82, 150);
-  textSize(14);
-  text("(" + ubicacionCorta + ")", tx, 62);
+  
+  fill(100, 118, 156); // azul lavardito
+  textSize(18);
+  text(conditionText + " en " + ubicacionCorta, 24, 38);
+
+ 
+
+  // texto ffff
+  //String tempStr = "Hacen maso " + nf(temp, 0, 1) + "°C.";
+  //text(tempStr, 24, 62);
+
+  
+  //float tx = 24 + textWidth(tempStr) + 8;
+  //fill(42, 56, 82, 150);
+  //textSize(14);
+  //text("(" + ubicacionCorta + ")", tx, 62);
 
   //  
-  fill(42, 56, 82);
+  //fill(42, 56, 82);
+  //textSize(14);
+
+  //text("Prob. de lluvias cercanas: " + int(precipProb * 100) + "%", 24, 82);
+
+//  text(promptClima, 24, 112, width - 48, 60);
   textSize(14);
+  text(promptClima, 24, 62, width - 48, 60);
 
-  text("Prob. de lluvias cercanas: " + int(precipProb * 100) + "%", 24, 82);
+  textSize(14);
+  String msg = convieneLavar ? "Sí, conviene lavar." : "No, no te conviene lavar.";
 
-  text(promptClima, 24, 112, width - 48, 60);
+ 
+  fill(70, 86, 118);  // azul grisáceo claro (misma idea que el original pero más suave)
+ // text(msg, 25, 183);
+  text(msg, 25, 120);
 
-  textSize(20);
-  String msg = convieneLavar ? "Sí, conviene lavar." : "No conviene lavar.";
 
-  // el halo ese 
-  fill(255, 40);
-  text(msg, 25, 183);
-
-  fill(55, 65, 80);
-  text(msg, 24, 182);
-
-  // mini barra que muestra cuanto de dia queda ahora mismo 
+  // mini barra que muestra cuanto de día queda ahora mismo
   noStroke();
   fill(236, 226, 235, 170);
-  rect(width - 34, 20, 12, 60, 8);
-
+  rect(width - 34, 34, 12, 60, 8);
+  
   fill(120, 145, 200, 200);
-  rect(width - 34, 20 + (1 - day) * 60, 12, day * 60, 8);
+  rect(width - 34, 34 + (1 - day) * 60, 12, day * 60, 8);
 }
+
+
 
 void fetchWeather() {
   lastFetchMs = millis();
@@ -247,41 +295,65 @@ void fetchWeather() {
     "https://api.open-meteo.com/v1/forecast"
     + "?latitude=" + LAT
     + "&longitude=" + LON
-    + "&current=temperature_2m,cloud_cover,wind_speed_10m,weather_code"
+    + "&current=temperature_2m,relative_humidity_2m,cloud_cover,wind_speed_10m,weather_code"
     + "&hourly=precipitation,precipitation_probability"
     + "&daily=precipitation_sum"
     + "&timezone=" + TZ;
 
   try {
     JSONObject json = loadJSONObject(url);
-    JSONObject current = json.getJSONObject("current");
-    JSONObject hourly = json.getJSONObject("hourly");
-    JSONObject daily = json.getJSONObject("daily");
 
-    temp = current.getFloat("temperature_2m");
-    cloud = constrain(current.getFloat("cloud_cover") / 100.0, 0, 1);
-    wind = current.getFloat("wind_speed_10m");
-    conditionText = weatherCodeToText(current.getInt("weather_code"));
+    JSONObject climaActual = json.getJSONObject("current");
+    JSONObject climaPorHora = json.getJSONObject("hourly");
+    JSONObject climaDiario = json.getJSONObject("daily");
 
-    JSONArray probs = hourly.getJSONArray("precipitation_probability");
-    JSONArray mm = hourly.getJSONArray("precipitation");
-    int horas = min(12, probs.size());
+    temp = climaActual.getFloat("temperature_2m");
+    humedad = constrain(climaActual.getFloat("relative_humidity_2m") / 100.0, 0, 1);
+    cloud = constrain(climaActual.getFloat("cloud_cover") / 100.0, 0, 1);
+    wind = climaActual.getFloat("wind_speed_10m");
 
-    precipProb = 0;
-    convieneLavar = true;
+    int codigoClima = climaActual.getInt("weather_code");
+    conditionText = weatherCodeToText(codigoClima);
 
-    for (int i = 0; i < horas; i++) {
-      float p = constrain(probs.getFloat(i) / 100.0, 0, 1);
-      precipProb += p;
+    JSONArray probLluviaPorHora = climaPorHora.getJSONArray("precipitation_probability");
+    JSONArray lluviaPorHoraMm = climaPorHora.getJSONArray("precipitation");
 
-      // aca esta la regla 
-      if (p >= 0.4 || mm.getFloat(i) > 0.1) convieneLavar = false;
+    int horasARevisar = min(12, min(probLluviaPorHora.size(), lluviaPorHoraMm.size()));
+
+    float probMaxima12h = 0;
+    float lluviaAcumulada12h = 0;
+    float sumaProbabilidades = 0;
+    boolean llueveDentroDe12h = false;
+
+    for (int i = 0; i < horasARevisar; i++) {
+      float probHora = constrain(probLluviaPorHora.getFloat(i) / 100.0, 0, 1);
+      float mmHora = max(0, lluviaPorHoraMm.getFloat(i));
+
+      sumaProbabilidades += probHora;
+      lluviaAcumulada12h += mmHora;
+      probMaxima12h = max(probMaxima12h, probHora);
+
+      // si al menos una hora ya es fea alcanza
+      if (probHora >= 0.45 || mmHora > 0.2) {
+        llueveDentroDe12h = true;
+      }
     }
 
-    if (horas > 0) precipProb /= horas;
+    precipProb = (horasARevisar > 0) ? (sumaProbabilidades / horasARevisar) : 0;
 
-    JSONArray rains = daily.getJSONArray("precipitation_sum");
-    if (rains.size() > 0) rainMm = rains.getFloat(0);
+    JSONArray lluviaDiaria = climaDiario.getJSONArray("precipitation_sum");
+    rainMm = (lluviaDiaria.size() > 0) ? max(0, lluviaDiaria.getFloat(0)) : 0;
+
+    convieneLavar = evaluarSiConvieneLavar(
+      temp,
+      humedad,
+      cloud,
+      wind,
+      codigoClima,
+      probMaxima12h,
+      lluviaAcumulada12h,
+      llueveDentroDe12h
+    );
 
     promptClima = buildPrompt();
 
@@ -291,23 +363,140 @@ void fetchWeather() {
   }
 }
 
-String buildPrompt() {
-  if (rainMm >= 1.0)
-    return "Garúa (aquella con su olvido hoy le ha abierto una gotera)";
+//aca va la logica dura, con variables mas claras
+boolean evaluarSiConvieneLavar(
+  float temperaturaActual,
+  float humedadActual,
+  float nubosidadActual,
+  float vientoActual,
+  int codigoClimaActual,
+  float probMaximaLluvia12h,
+  float lluviaAcumulada12h,
+  boolean llueveDentroDe12h
+) {
+  boolean climaInestableAhora = (codigoClimaActual >= 80 && codigoClimaActual <= 99);
 
-  if (precipProb >= 0.55)
-    return "Posibilidades reales de que caigan soretes de punta";
+  // si parece que va a llover, no lavar
+  if (llueveDentroDe12h) return false;
+  if (probMaximaLluvia12h >= 0.60) return false;
+  if (lluviaAcumulada12h >= 1.5) return false;
+  if (climaInestableAhora && humedadActual >= 0.80) return false;
 
-  if (cloud >= 0.7 && precipProb < 0.4)
-    return "Grease (gris largo que promete lluvia pero no concreta)";
+  // puntaje de secado:  (si re pesada ya se)
+  // arranca 0 y va sumando o restando según si el ambiente ayuda o arruina.
+  float puntajeSecado = 0;
 
-  if (cloud >= 0.4)
-    return "Rozando lo nuboso";
+  // considera la humedad 
+  if (humedadActual >= 0.90) {
+    puntajeSecado -= 4.5;
+  } else if (humedadActual >= 0.85) {
+    puntajeSecado -= 3.5;
+  } else if (humedadActual >= 0.78) {
+    puntajeSecado -= 2.5;
+  } else if (humedadActual >= 0.70) {
+    puntajeSecado -= 1.2;
+  } else {
+    puntajeSecado += 0.8;
+  }
 
-  return "Bastante despejado.";
+  // temp poque seca re lento
+  if (temperaturaActual < 18) {
+    puntajeSecado -= 2.0;
+  } else if (temperaturaActual < 22) {
+    puntajeSecado -= 1.0;
+  } else if (temperaturaActual <= 30) {
+    puntajeSecado += 1.2;
+  } else {
+    puntajeSecado += 0.6;
+  }
+
+  //  nada de viento en ambiente húmedo hmm
+  if (vientoActual < 5) {
+    puntajeSecado -= 2.0;
+  } else if (vientoActual < 9) {
+    puntajeSecado -= 0.8;
+  } else if (vientoActual <= 18) {
+    puntajeSecado += 1.3;
+  } else {
+    puntajeSecado += 0.8;
+  }
+
+  // nubes
+  if (nubosidadActual >= 0.90) {
+    puntajeSecado -= 1.5;
+  } else if (nubosidadActual >= 0.75) {
+    puntajeSecado -= 0.8;
+  } else if (nubosidadActual <= 0.35) {
+    puntajeSecado += 0.5;
+  }
+
+  // penalizaciones combinadas
+  
+  if (humedadActual >= 0.85 && vientoActual < 8) {
+    puntajeSecado -= 2.2;
+  }
+
+  if (humedadActual >= 0.78 && temperaturaActual < 22) {
+    puntajeSecado -= 1.5;
+  }
+
+  if (nubosidadActual >= 0.80 && humedadActual >= 0.78 && vientoActual < 8) {
+    puntajeSecado -= 1.5;
+  }
+
+  // riesgo de lluvia futura también afecta
+  if (probMaximaLluvia12h >= 0.35) {
+    puntajeSecado -= 1.0;
+  }
+
+  if (lluviaAcumulada12h >= 0.7) {
+    puntajeSecado -= 1.0;
+  }
+
+  // Umbral: arriba de 0.5 da una ventana de OK para mi mejorar
+  return puntajeSecado > 0.5;
 }
 
 String weatherCodeToText(int code) {
+  if (code == 0) return "despejado";
+
+  if (code == 1) return "mayormente despejado";
+  if (code == 2) return "rozando lo nuboso";
+  if (code == 3) return "drama nuboso";
+
+  if (code == 45 || code == 48) return "bruma húmeda";
+  
+  if (code >= 51 && code <= 57) return "llovizna";
+  if (code >= 61 && code <= 67) return "lluvia";
+
+  if (code >= 71 && code <= 77) return "precipitación confusa";
+
+  if (code >= 80 && code <= 82) return "energías inestables";
+  if (code >= 85 && code <= 86) return "posible agua fría cayendo";
+
+  if (code >= 95 && code <= 100) return "está pesado";
+
+  return "variable como mi voluntad";
+}
+
+String buildPrompt() { // GRACIAS PATO POR ARMAR ESTO
+  if (rainMm >= 1.0)
+    return "proximo a garuar (aquella que con su olvido hoy le ha abierto una gotera)";
+
+  if (precipProb >= 0.55)
+    return "grease (sería ese gris largo que promete lluvia pero no concreta)";
+
+  if (cloud >= 0.7 && precipProb < 0.4)
+    return "posibilidades reales de que caigan soretes de punta";
+
+  if (cloud >= 0.4)
+    return "mucha nube, pero no tanta. en realidad muy pocas nubes.";
+
+  return "soleadou y despejadou";
+}
+
+
+String weatherCodeToTextold(int code) {
   if (code == 0) return "despejado";
   if (code <= 3) return "rozando lo nuboso";
   if (code == 45 || code == 48) return "bruma húmeda";
@@ -325,6 +514,30 @@ float getLocalHour() {
   }
 }
 
+void drawCloseButton() {
+
+  float x = width - 16;
+  float y = 14;
+
+  noStroke();
+  fill(dist(mouseX, mouseY, x, y) < closeR ? color(210,95,95) : color(180,90,90));
+  circle(x, y, closeR * 2);
+
+  stroke(255, 220);
+  strokeWeight(1.5);
+  line(x-3, y-3, x+3, y+3);
+  line(x+3, y-3, x-3, y+3);
+}
+
+void mousePressed() {
+
+  float x = width - 16;
+  float y = 14;
+
+  if (dist(mouseX, mouseY, x, y) < closeR) {
+    exit();
+  }
+}
 void tryFetchLocationByIP() {
   try {
     // ipwho.is suele ser fácil de parsear y no requiere API key
