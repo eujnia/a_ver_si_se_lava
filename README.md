@@ -1,7 +1,19 @@
 ## a ver si se lava
 
-Just a tiny processing sketch that checks the weather and answers if you should do laundry today. It pulls live data from Open-Meteo and turns it into a very small animated landscape (sky, clouds, rain, wind and water movement change according to current conditions).
-If rain is likely in the next few hours, it suggests not washing clothes.
+
+A tiny cozy Processing sketch that checks the weather and answers if you should do laundry today. 
+
+It pulls live data from Open-Meteo and turns it into a small animated weather scene that changes with the real conditions outside. 
+Based on the current conditions, it gives a tiny yes-or-no answer on whether today feels like a good laundry day.
+
+The laundry verdict comes from a simple score: It first rules out the cases like near-future rain or unstable wet weather, and then builds a drying score based on humidity, temperature, wind and cloud cover. Some combinations are penalized extra, especially when the air is humid and heavy. 
+
+<p align="center">
+$\text{drying score} = \text{humidity score} + \text{temperature score} + \text{wind score} + \text{cloudiness score} + \text{combined penalties} + \text{low rain penalties}$
+</p>
+
+If the final score clears a small threshold, the day is marked as laundry-friendly.
+
 
 <img width="859" height="678" alt="imagen" src="https://github.com/user-attachments/assets/300e9c73-1c8e-4c11-b999-092c6498be07" />
 
