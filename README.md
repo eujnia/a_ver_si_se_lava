@@ -8,9 +8,10 @@ Based on the current conditions, it gives a tiny yes-or-no answer on whether tod
 
 The laundry verdict comes from a simple score: It first rules out the cases like near-future rain or unstable wet weather, and then builds a drying score based on humidity, temperature, wind and cloud cover. Some combinations are penalized extra, especially when the air is humid and heavy. 
 
-<p align="center">
-$\text{drying score} = \text{humidity score} + \text{temperature score} + \text{wind score} + \text{cloudiness score} + \text{combined penalties} + \text{low rain penalties}$
-</p>
+
+```math
+\text{drying score} = \text{humidity score} + \text{temperature score} + \text{wind score} + \text{cloudiness score} + \text{combined penalties} + \text{low rain penalties}
+```
 
 If the final score clears a small threshold, the day is marked as laundry-friendly.
 
