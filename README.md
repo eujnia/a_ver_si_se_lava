@@ -1,7 +1,7 @@
 ## a ver si se lava
 
 
-A tiny cozy Processing sketch that checks the weather and answers if you should do laundry today. 
+A tiny cozy app that checks the weather and answers if you should do laundry today. 
 
 It pulls live data from Open-Meteo and turns it into a small animated weather scene that changes with the real conditions outside. 
 Based on the current conditions, it gives a tiny yes-or-no answer on whether today feels like a good laundry day.
