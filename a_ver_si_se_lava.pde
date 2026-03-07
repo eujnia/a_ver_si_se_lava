@@ -2,10 +2,22 @@ import java.time.*;
 import processing.awt.PSurfaceAWT;
 import java.awt.Frame;
 import java.awt.geom.RoundRectangle2D;
+import javax.swing.JFrame; 
+import java.awt.MouseInfo;
+import java.awt.Point;
 
 float humedad = 0;   // 0..1
 float closeR = 10;
 
+boolean arrastrandoVentana = false;
+int offsetMouseX, offsetMouseY;
+
+
+JFrame ventana;
+
+
+int mousePantallaInicioX, mousePantallaInicioY;
+int ventanaInicioX, ventanaInicioY;
 // -  intenta sacar ubicación aproximada por IP sino usa los de SANTA FE vieja y peluda
 
 final float DEFAULT_LAT = -31.6333;
@@ -31,10 +43,12 @@ int lastFetchMs = -999999;
 int fetchEveryMs = 60 * 1000;
 
 void setup() {
-  size(400, 200);
+  size(360, 200);
    // ventana real 
-  PSurfaceAWT.SmoothCanvas canvas = 
-     (PSurfaceAWT.SmoothCanvas) surface.getNative();
+  
+  PSurfaceAWT awtSurface = (PSurfaceAWT) surface;
+  PSurfaceAWT.SmoothCanvas canvas = (PSurfaceAWT.SmoothCanvas) awtSurface.getNative();
+  ventana = (JFrame) canvas.getFrame();
 
   Frame frame = canvas.getFrame();
   frame.dispose();
@@ -487,7 +501,7 @@ String buildPrompt() { // GRACIAS PATO POR ARMAR ESTO
     return "grease (sería ese gris largo que promete lluvia pero no concreta)";
 
   if (cloud >= 0.7 && precipProb < 0.4)
-    return "posibilidades reales de que caigan soretes de punta";
+    return "SIN posibilidades reales de que caigan soretes de punta";
 
   if (cloud >= 0.4)
     return "mucha nube, pero no tanta. en realidad muy pocas nubes.";
@@ -514,30 +528,7 @@ float getLocalHour() {
   }
 }
 
-void drawCloseButton() {
 
-  float x = width - 16;
-  float y = 14;
-
-  noStroke();
-  fill(dist(mouseX, mouseY, x, y) < closeR ? color(210,95,95) : color(180,90,90));
-  circle(x, y, closeR * 2);
-
-  stroke(255, 220);
-  strokeWeight(1.5);
-  line(x-3, y-3, x+3, y+3);
-  line(x+3, y-3, x-3, y+3);
-}
-
-void mousePressed() {
-
-  float x = width - 16;
-  float y = 14;
-
-  if (dist(mouseX, mouseY, x, y) < closeR) {
-    exit();
-  }
-}
 void tryFetchLocationByIP() {
   try {
     // ipwho.is suele ser fácil de parsear y no requiere API key
@@ -572,4 +563,57 @@ void tryFetchLocationByIP() {
     LON = DEFAULT_LON;
     ubicacionCorta = "SF";
   }
+}
+
+// ------------------------ mover y boton de cerrado
+void drawCloseButton() {
+  float x = width - 16;
+  float y = 14;
+
+  noStroke();
+  fill(dist(mouseX, mouseY, x, y) < closeR ? color(210, 95, 95) : color(180, 90, 90));
+  circle(x, y, closeR * 2);
+
+  stroke(255, 220);
+  strokeWeight(1.5);
+  line(x - 3, y - 3, x + 3, y + 3);
+  line(x + 3, y - 3, x - 3, y + 3);
+}
+
+
+void mousePressed() {
+  float x = width - 16;
+  float y = 14;
+
+  if (dist(mouseX, mouseY, x, y) < closeR) {
+    exit();
+    return;
+  }
+
+  if (ventana != null) {
+    Point puntero = MouseInfo.getPointerInfo().getLocation();
+
+    mousePantallaInicioX = puntero.x;
+    mousePantallaInicioY = puntero.y;
+
+    ventanaInicioX = ventana.getX();
+    ventanaInicioY = ventana.getY();
+
+    arrastrandoVentana = true;
+  }
+}
+
+void mouseDragged() {
+  if (arrastrandoVentana && ventana != null) {
+    Point puntero = MouseInfo.getPointerInfo().getLocation();
+
+    int deltaX = puntero.x - mousePantallaInicioX;
+    int deltaY = puntero.y - mousePantallaInicioY;
+
+    ventana.setLocation(ventanaInicioX + deltaX, ventanaInicioY + deltaY);
+  }
+}
+
+void mouseReleased() {
+  arrastrandoVentana = false;
 }
