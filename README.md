@@ -18,19 +18,19 @@ If the final score clears a small threshold, the day is marked as laundry-friend
 
 <img width="859" height="678" alt="imagen" src="https://github.com/user-attachments/assets/300e9c73-1c8e-4c11-b999-092c6498be07" />
 
-#### How to run:
+### How to run:
 
-For a quick try (Windows):
+#### For a quick try (Windows):
 
 1. Download the executable from the **Releases** section.
 
 2. Unzip the file and run: a_ver_si_se_lava.exe
-
-The download is relatively LARGE because it includes a bundled Java so it can run on any win, so you don't need to install anything.
+   
+Note: The download includes a minimized Java runtime so it can run on any Windows machine without requiring a separate installation :)
 
 ---
 
-Run the code (lightweight, and you can experiment):
+#### Run the code (lightweight, and you can experiment):
 
 1. Install Processing: https://processing.org/download
 
@@ -45,7 +45,7 @@ The sketch will fetch weather data from the Open-Meteo API and generate the land
 
 
 
-## Built with
+### Built with
 
 Processing (Java mode)
 
