@@ -1,4 +1,4 @@
-## a ver si se lava
+# a ver si se lava
 
 
 A tiny cozy app that checks the weather and answers if you should do laundry today. 
